@@ -1,3 +1,5 @@
+import json
+
 from numpy import array, float32
 from onnxruntime import NodeArg
 
@@ -26,7 +28,7 @@ default_custom = {
 
 
 def wrap_num_param(param):
-    return [[array(param, dtype=float32)]]
+    return [[array(param, dtype=float32).tolist()]]
 
 
 def wrap_cat_param(param):

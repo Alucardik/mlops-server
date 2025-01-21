@@ -3,10 +3,12 @@ from pathlib import Path
 from os import getenv
 
 from onnxruntime import InferenceSession, NodeArg
+from mlflow import start_run
+from mlflow.onnx import log_model
 
 
 class ModelsRegistry:
-    _models_dir: Path = Path(getenv("MODELS_DIR") or "./").resolve()
+    _models_dir: Path = Path(getenv("MODELS_DIR") or "./models").resolve()
     _inference_sessions: dict[str, InferenceSession] = {}
 
     def __init__(self, models_dir: str = None):
@@ -14,7 +16,7 @@ class ModelsRegistry:
             self._models_dir = Path(models_dir).resolve()
 
 
-    def register_models(self):
+    def register_models(self, log_in_mlflow: bool = False):
         print("registering models from", self._models_dir)
         print("only onnx models are supported")
 
@@ -28,8 +30,18 @@ class ModelsRegistry:
                 print("encountered model", p.name, "several times, only the first occurrence is registered")
                 continue
 
+            if log_in_mlflow:
+                with start_run():
+                    log_model(
+                        p.read_bytes(),
+                        model_name,
+                        registered_model_name=model_name,
+                        onnx_execution_providers=["CPUExecutionProvider"],
+                    )
+                    print("registered in mlflow model:", model_name)
+
             self._inference_sessions[model_name] = InferenceSession(p, providers=["CPUExecutionProvider"])
-            print("registered model:", model_name)
+            print("registered model locally:", model_name)
 
     def get_registered_model_names(self) -> list[str]:
         return list(self._inference_sessions.keys())
@@ -53,4 +65,4 @@ class ModelsRegistry:
         if model_name not in self._inference_sessions:
             return None
 
-        self._inference_sessions[model_name].run(output_names, inputs)
+        return self._inference_sessions[model_name].run(output_names, inputs)

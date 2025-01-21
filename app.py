@@ -1,3 +1,4 @@
+import json
 from os import getenv
 
 from flask import Flask, request
@@ -7,7 +8,7 @@ from model_params import assemble_model_input
 
 
 models_registry = ModelsRegistry()
-models_registry.register_models()
+models_registry.register_models(log_in_mlflow=False)
 
 first_model_name = models_registry.get_registered_model_names()[0]
 inputs = models_registry.get_model_inputs(first_model_name)
@@ -33,4 +34,4 @@ def predict(model_name: str):
 
 
 if __name__ == "__main__":
-    app.run(host=getenv("SERVER_HOST") or "0.0.0.0", port=int(getenv("SERVER_PORT")) or 8080)
+    app.run(host=getenv("SERVER_HOST") or "0.0.0.0", port=int(getenv("SERVER_PORT") or 8080))
