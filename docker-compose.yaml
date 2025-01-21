@@ -1,0 +1,27 @@
+services:
+  mlops-server:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 4500
+      MODELS_DIR: /onnx_models
+    ports:
+      - '4500:4500'
+    volumes:
+      - ./models/:/onnx_models
+
+
+  mlops-front:
+    image: alucardikanno/iachekin-mlops-frontend:latest
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      ORIGIN: http://localhost:8080
+      API_ENDPOINT: mlops-server:4500
+      MODEL_VERSION: model_v2
+    ports:
+      - '8080:8080'
+    depends_on:
+      - mlops-server

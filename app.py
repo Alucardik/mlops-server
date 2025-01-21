@@ -1,79 +1,36 @@
-from typing import Dict
+from os import getenv
 
-import onnxruntime as rt
 from flask import Flask, request
 
-import model_params as mp
+from models import ModelsRegistry
+from model_params import assemble_model_input
 
 
-inference_session_v1 = rt.InferenceSession("model_v1.onnx", providers=["CPUExecutionProvider"])
-inference_session_v2 = rt.InferenceSession("model_v2.onnx", providers=["CPUExecutionProvider"])
-inputs = inference_session_v2.get_inputs()
-label_name = inference_session_v2.get_outputs()[0].name
+models_registry = ModelsRegistry()
+models_registry.register_models()
+
+first_model_name = models_registry.get_registered_model_names()[0]
+inputs = models_registry.get_model_inputs(first_model_name)
+label_name = models_registry.get_model_outputs(first_model_name)[0].name
+
 app = Flask(__name__)
 
 
-def assemble_model_input(body: Dict) -> Dict:
-    selected_amenities = set(body.get("amenities", []))
-    default_true = {"availability_30", "availability_60", "availability_90", "availability_365", "host_is_superhost"}
-    default_85 = {"number_of_reviews_ltm", "review_scores_rating"}
-    default_custom = {
-        "latitude": 41.40889,
-        "longitude": 2.18555,
-    }
+@app.route("/predict/<string:model_name>", methods=["PUT"])
+def predict(model_name: str):
+    body: dict = request.get_json()
 
-    model_input = {}
-    for inp in inputs:
-        input_name = inp.name
-        if input_name in default_custom:
-            model_input[input_name] = mp.wrap_num_param(default_custom[input_name])
-            continue
-        if input_name in default_true:
-            model_input[input_name] = mp.wrap_num_param(1.)
-            continue
-        if input_name in default_85:
-            model_input[input_name] = mp.wrap_num_param(85.)
-            continue
-        if input_name.startswith("has_"):
-            model_input[input_name] = mp.wrap_num_param(1 if input_name[4:] in selected_amenities else 0)
-            continue
-        if input_name in mp.num_cols:
-            model_input[input_name] = mp.wrap_num_param(body.get(input_name))
-            continue
-        if input_name in mp.cat_cols:
-            model_input[input_name] = mp.wrap_cat_param(body.get(input_name))
-            continue
-
-    return model_input
-
-
-@app.route("/predict/v1", methods=["PUT"])
-def predict_v1():
-    body: Dict = request.get_json()
+    if not models_registry.is_model_registered(model_name):
+        return "Unknown model", 404
 
     try:
-        model_input = assemble_model_input(body)
+        model_input = assemble_model_input(body, inputs)
     except Exception as e:
         print(e)
         return "Invalid input", 400
 
-
-    return str(inference_session_v1.run([label_name], model_input)[0][0][0])
-
-
-@app.route("/predict/v2", methods=["PUT"])
-def predict_v2():
-    body: Dict = request.get_json()
-
-    try:
-        model_input = assemble_model_input(body)
-    except Exception as e:
-        print(e)
-        return "Invalid input", 400
-
-
-    return str(inference_session_v2.run([label_name], model_input)[0][0][0])
+    return str(models_registry.run_inference(model_name, [label_name], model_input)[0][0][0])
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(host=getenv("SERVER_HOST") or "0.0.0.0", port=int(getenv("SERVER_PORT")) or 8080)
