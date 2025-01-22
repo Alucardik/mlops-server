@@ -62,7 +62,7 @@ class ModelsRegistry:
         return None
 
     def run_inference(self, model_name: str, output_names: list[str], inputs: dict[str, Any]) -> Optional[Any]:
-        if model_name not in self._inference_sessions:
-            return None
+        if model_name in self._inference_sessions:
+            return self._inference_sessions[model_name].run(output_names, inputs)
 
-        return self._inference_sessions[model_name].run(output_names, inputs)
+        return None

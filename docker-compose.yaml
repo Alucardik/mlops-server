@@ -3,6 +3,7 @@ services:
     build:
       context: .
     restart: unless-stopped
+    hostname: mlops-server
     environment:
       SERVER_PORT: 4500
       MODELS_DIR: /onnx_models
@@ -19,9 +20,18 @@ services:
       HOST: 0.0.0.0
       PORT: 8080
       ORIGIN: http://localhost:8080
-      API_ENDPOINT: mlops-server:4500
+      API_ENDPOINT: http://mlops-server:4500
       MODEL_VERSION: model_v2
     ports:
       - '8080:8080'
     depends_on:
       - mlops-server
+
+  mlops-mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.20.0rc0
+    restart: unless-stopped
+    ports:
+      - '6000:6000'
+    command: ["mlflow", "models", "serve", "--model-uri", "/onnx_models/model_1", "--port", "6000"]
+    volumes:
+      - ./mlruns/0/efc258e3e37641d5a0afa2163f35a993/artifacts/:/onnx_models/
